@@ -51,5 +51,5 @@ function calculateStorageSlot(namespace: string): string {
 }
 
 // --- 执行 ---
-const TARGET_NAMESPACE = "luna.storage.EqToken";
+const TARGET_NAMESPACE = "luna.storage.VaultController";
 calculateStorageSlot(TARGET_NAMESPACE);

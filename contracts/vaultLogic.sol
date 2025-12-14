@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /**
@@ -13,7 +13,7 @@ import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
  * - 允许 Relayer（owner）执行 fillOrder 交易
  * - 接收/返还 CTF Outcome Tokens
  */
-contract VaultLogic is OwnableUpgradeable, UUPSUpgradeable {
+contract VaultLogic is Ownable, UUPSUpgradeable {
     // ====== 状态变量（Proxy 的 storage layout 必须与此一致） ======
     address public usdcToken;           // USDC 合约地址
     address public ctfCore;             // Conditional Tokens Framework 地址
@@ -44,6 +44,7 @@ contract VaultLogic is OwnableUpgradeable, UUPSUpgradeable {
         exchangeWrapper = _exchangeWrapper;
 
         _transferOwnership(_owner); // Relayer 作为 owner
+    }
 
     //用户存款 
     function depositUSDC(uint256 amount) external {
