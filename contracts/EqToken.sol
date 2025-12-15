@@ -12,7 +12,7 @@ interface IEqToken {
 
     event ManagerCreateID(address indexed managerAddr, uint256 indexed eqTokenID);
 
-    event Strategy(address indexed managerAddr, uint256[] percents, uint256[] ctfIDs);
+    event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, uint256[] ctfIDs);
 
     event RoleChanged(address indexed newAddr, address indexed oldAddr, bytes32 indexed role);
 
@@ -162,7 +162,7 @@ contract EqToken is
         );
         $._idBalances[eqId].isSet = true;
         emit ManagerCreateID(managerAddr, eqId);
-        emit Strategy(managerAddr, percents, ctfIDs);
+        emit Strategy(managerAddr, eqId, percents, ctfIDs);
         return eqId;
     }
 
