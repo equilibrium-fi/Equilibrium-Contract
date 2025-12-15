@@ -12,6 +12,8 @@ interface IEqToken {
 
     event ManagerCreateID(address indexed managerAddr, uint256 indexed eqTokenID);
 
+    event Strategy(address indexed managerAddr, uint256[] percents, uint256[] ctfIDs);
+
     event RoleChanged(address indexed newAddr, address indexed oldAddr, bytes32 indexed role);
 
     event URIChanged(string indexed newuri);
@@ -71,12 +73,12 @@ contract EqToken is
     }
 
     function __EqToken_init(
-        string memory uri_,
+        string memory _uri,
         address minter,
         address burner,
         address admin
     ) public initializer {
-        __ERC1155_init(uri_);
+        __ERC1155_init(_uri);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(MINTER_ROLE, minter);
@@ -160,6 +162,7 @@ contract EqToken is
         );
         $._idBalances[eqId].isSet = true;
         emit ManagerCreateID(managerAddr, eqId);
+        emit Strategy(managerAddr, percents, ctfIDs);
         return eqId;
     }
 
