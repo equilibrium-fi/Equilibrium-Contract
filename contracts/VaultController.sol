@@ -14,6 +14,8 @@ contract VaultController is IVaultController, Initializable, OwnableUpgradeable,
         mapping(address => uint256) _USDCbook;
         uint256 manageRating;
         address manageAddr;
+        address public usdcToken;           // USDC 合约地址
+        address public ctfCore;             // Conditional Tokens Framework 地址
     }
 
     // keccak256(abi.encode(uint256(keccak256("luna.storage.VaultController")) - 1)) & ~bytes32(uint256(0xff))
@@ -38,7 +40,35 @@ contract VaultController is IVaultController, Initializable, OwnableUpgradeable,
 
     }
 
-    function withdrawUSDC() external onlyOwner {
+    function redeemCTFForUSDC(
+    bytes32 conditionId,        
+    uint256[] calldata indexSets,
+    uint256 amount
+) external onlyOwner {
+    require(conditionId != bytes32(0), "ConditionId zero");
+    require(indexSets.length > 0, "IndexSets empty");
+    require(amount > 0, "Amount zero");
+    VaultStorage storage $ = _getVaultStorage();
+    (bool success, ) = $.ctfCore.call(
+        abi.encodeWithSelector(   
+    bytes4(keccak256("redeemPositions(address,bytes32,bytes32,uint256[],uint256)")),
+            $._usdcToken,  
+            bytes32(0),
+            conditionId, 
+            indexSets,
+            amount
+        )
+    );
+    require(success, "CTF redeem failed");
+}
+    
+    function withdrawUSDC(address user, uint256 amount) external onlyOwner {
+        vaultstorage storage $ = _getVaultStorage();
+        require(manageAddr != address(0), "User zero");
+        require(amount > 0, "Amount zero");
+        IERC20($._usdcToken).transfer(user, amount);
+        
+
 
     }
 
