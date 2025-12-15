@@ -79,7 +79,7 @@ contract VaultController is IVaultController, Initializable, OwnableUpgradeable,
 }
     
     function withdrawUSDC(address user, uint256 amount) external onlyOwner {
-        vaultstorage storage $ = _getVaultStorage();
+        VaultStorage storage $ = _getVaultStorage();
         require(manageAddr != address(0), "User zero");
         require(amount > 0, "Amount zero");
         IERC20($._usdcToken).transfer(user, amount);
