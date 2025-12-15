@@ -16,7 +16,7 @@ interface IEqToken {
 
     event URIChanged(string indexed newuri);
 
-    function generateID(uint256[] calldata percent, uint256[] calldata ctfID, address managerAddr) external returns(uint256);
+    function generateID(uint256[] calldata percents, uint256[] calldata ctfIDs, address managerAddr) external returns(uint256);
 
     function setURI(string memory newUri) external;
 
