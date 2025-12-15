@@ -16,17 +16,19 @@ interface IEqToken {
 
     event URIChanged(string indexed newuri);
 
-    function generateID(uint256[] calldata percent, uint256[] calldata sharesID, address managerAddr) external;
+    function generateID(uint256[] calldata percent, uint256[] calldata ctfID, address managerAddr) external returns(uint256);
 
-    function setURI(string memory newuri) external;
+    function setURI(string memory newUri) external;
 
     function mint(address to, uint256 id, uint256 value, bytes memory data) external;
 
     function burn(address from, uint256 id, uint256 value) external;
 
-    function proposeRole(bytes32 role, address newAdmin) external;
+    function proposeRole(bytes32 role, address newAddr) external;
 
     function acceptRole(bytes32 role, address callerConfirmation, address oldAdmin) external;
+
+    function balanceOf(address account, uint256 id) external view returns (uint256);
 }
 
 contract EqToken is
@@ -45,6 +47,7 @@ contract EqToken is
     struct _balanceBook {
         mapping(address account => uint256) _balance;
         bool isSet;
+        uint256 totalAmount;
     }
 
     struct EqTokenStorage {
@@ -125,7 +128,9 @@ contract EqToken is
         uint256 value,
         bytes memory data
     ) external onlyRole(MINTER_ROLE) isExistent(id) {
+        EqTokenStorage storage $ = _getEqTokenStorage();
         _mint(to, id, value, data);
+        $._idBalances[id].totalAmount += value;
     }
 
     function proposeRole(
@@ -145,16 +150,17 @@ contract EqToken is
     }
 
     function generateID(
-        uint256[] calldata percent,
-        uint256[] calldata sharesID,
+        uint256[] calldata percents,
+        uint256[] calldata ctfIDs,
         address managerAddr
-    ) external onlyProxy {
+    ) external onlyProxy returns(uint256) {
         EqTokenStorage storage $ = _getEqTokenStorage();
         uint256 eqId = uint256(
-            keccak256(abi.encode(percent, sharesID, managerAddr))
+            keccak256(abi.encode(percents, ctfIDs, managerAddr))
         );
         $._idBalances[eqId].isSet = true;
         emit ManagerCreateID(managerAddr, eqId);
+        return eqId;
     }
 
     function setURI(
@@ -162,6 +168,14 @@ contract EqToken is
     ) external onlyRole(DEFAULT_ADMIN_ROLE) onlyProxy {
         _setURI(newuri);
         emit URIChanged(newuri);
+    }
+
+    function getUserAmount(uint256 tokenID, address userAddr) view external returns(uint256 , uint256) {
+        EqTokenStorage storage $ = _getEqTokenStorage();
+        return (
+            $._idBalances[tokenID]._balance[userAddr],
+            $._idBalances[tokenID].totalAmount
+        );
     }
 
     // override functions
@@ -251,7 +265,7 @@ contract EqToken is
     function balanceOf(
         address account,
         uint256 id
-    ) public view override onlyProxy returns (uint256) {
+    ) public view override(ERC1155Upgradeable, IEqToken) onlyProxy returns (uint256) {
         EqTokenStorage storage $ = _getEqTokenStorage();
         return $._idBalances[id]._balance[account];
     }
