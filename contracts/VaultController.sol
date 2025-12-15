@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IVaultController {
 
@@ -11,11 +13,12 @@ interface IVaultController {
 
 contract VaultController is IVaultController, Initializable, OwnableUpgradeable, UUPSUpgradeable {
     struct VaultStorage {
+        address usdcAddr;
         mapping(address => uint256) _USDCbook;
-        uint256 manageRating;
-        address manageAddr;
-        address public usdcToken;           // USDC 合约地址
-        address public ctfCore;             // Conditional Tokens Framework 地址
+        uint256 managerRating;
+        address managerAddr;
+        address ctfCore;
+        address usdcToken;
     }
 
     // keccak256(abi.encode(uint256(keccak256("luna.storage.VaultController")) - 1)) & ~bytes32(uint256(0xff))
@@ -32,12 +35,25 @@ contract VaultController is IVaultController, Initializable, OwnableUpgradeable,
         }
     }
 
-    function __Vault_init(address initialOwner) public initializer {
+    function __Vault_init(address initialOwner, address managerAddr, uint256 managerRating) public initializer {
         __Ownable_init(initialOwner);
+        VaultStorage storage $ = _getVaultStorage();
+        $.managerAddr = managerAddr;
+        $.managerRating = managerRating;
     }
 
-    function depositUSDC() external {
-
+    function depositUSDC(address owner, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external {
+        VaultStorage storage $ = _getVaultStorage();
+        IERC20Permit($.usdcAddr).permit(
+            owner,
+            address(this),
+            value,
+            deadline,
+            v,
+            r,
+            s
+        );
+        IERC20($.usdcAddr).transferFrom(owner, msg.sender, value);
     }
 
     function redeemCTFForUSDC(
