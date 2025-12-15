@@ -3,6 +3,8 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
-    "hardhat": "^2.27.2"
+    "hardhat": "^2.27.2",
+    "prettier": "^3.7.4",
+    "prettier-plugin-solidity": "^2.2.0"
   }
 }
