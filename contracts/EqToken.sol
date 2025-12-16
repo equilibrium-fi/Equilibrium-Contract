@@ -12,13 +12,13 @@ interface IEqToken {
 
     event ManagerCreateID(address indexed managerAddr, uint256 indexed eqTokenID);
 
-    event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, uint256[] ctfIDs);
+    event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, uint256[] ctfIDs, uint256[] indexSets);
 
     event RoleChanged(address indexed newAddr, address indexed oldAddr, bytes32 indexed role);
 
     event URIChanged(string indexed newuri);
 
-    function generateID(uint256[] calldata percents, uint256[] calldata ctfIDs, address managerAddr) external returns(uint256);
+    function generateID(uint256[] calldata percents, uint256[] calldata ctfIDs, uint256[] calldata indexSets, address managerAddr) external returns(uint256);
 
     function setURI(string memory newUri) external;
 
@@ -154,15 +154,16 @@ contract EqToken is
     function generateID(
         uint256[] calldata percents,
         uint256[] calldata ctfIDs,
+        uint256[] calldata indexSets,
         address managerAddr
     ) external onlyProxy returns(uint256) {
         EqTokenStorage storage $ = _getEqTokenStorage();
         uint256 eqId = uint256(
-            keccak256(abi.encode(percents, ctfIDs, managerAddr))
+            keccak256(abi.encode(percents, ctfIDs, indexSets, managerAddr))
         );
         $._idBalances[eqId].isSet = true;
         emit ManagerCreateID(managerAddr, eqId);
-        emit Strategy(managerAddr, eqId, percents, ctfIDs);
+        emit Strategy(managerAddr, eqId, percents, ctfIDs, indexSets);
         return eqId;
     }
 
