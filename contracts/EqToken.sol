@@ -12,13 +12,13 @@ interface IEqToken {
 
     event ManagerCreateID(address indexed managerAddr, uint256 indexed eqTokenID);
 
-    event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, uint256[] ctfIDs, uint256[] indexSets);
+    event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, bytes32[] ctfIDs, uint256[] indexSets);
 
     event RoleChanged(address indexed newAddr, address indexed oldAddr, bytes32 indexed role);
 
     event URIChanged(string indexed newuri);
 
-    function generateID(uint256[] calldata percents, uint256[] calldata ctfIDs, uint256[] calldata indexSets, address managerAddr) external returns(uint256);
+    function generateID(uint256[] calldata percents, bytes32[] calldata ctfIDs, uint256[] calldata indexSets, address managerAddr) external returns(uint256);
 
     function setURI(string memory newUri) external;
 
@@ -153,7 +153,7 @@ contract EqToken is
 
     function generateID(
         uint256[] calldata percents,
-        uint256[] calldata ctfIDs,
+        bytes32[] calldata ctfIDs,
         uint256[] calldata indexSets,
         address managerAddr
     ) external onlyProxy returns(uint256) {
