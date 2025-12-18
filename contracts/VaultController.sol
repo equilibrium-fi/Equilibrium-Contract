@@ -7,22 +7,20 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IEqToken} from "./EqToken.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface IVaultController {
-    event ApproveSuccess(address indexed user);
-
-    event DepositUSDC(address indexed user, uint256 value);
-
     event Withdraw(address indexed user, uint256 value2User, uint256 value2Manage);
 
-    function userApprove(address owner, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function redeemCTF2USDC(bytes32 conditionId, uint256[] calldata indexSets) external;
 
-    function depositUSDC(address user, uint256 value) external;
-
-    function redeemCTF2USDC(bytes32 conditionId, uint256[] calldata indexSets, uint256 amount) external;
+    function getBalanceOfUSDC() external;
 
     function withdrawUSDC(address user) external; //TODO
+}
 
+interface IConditionalTokens {
+    function redeemPositions(IERC20 collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint[] calldata indexSets) external;
 }
 
 contract VaultController is
@@ -34,6 +32,7 @@ contract VaultController is
     struct VaultStorage {
         uint256 eqID;
         uint256 managerRating;
+        uint256 ratingPrecision;
         uint256 totalUSDC;
         address managerAddr;
         address ctfCore;
@@ -53,12 +52,13 @@ contract VaultController is
 
     function __Vault_init(
         address initialOwner,
-        address _managerAddr,
+        uint256 _eqID,
         uint256 _managerRating,
-        address _usdcToken,
+        uint256 _ratingPrecision,
+        address _managerAddr,
         address _ctfCore,
-        address _eqTokenAddr,
-        uint256 _eqID
+        address _usdcToken,
+        address _eqTokenAddr
     ) public initializer {
         __Ownable_init(initialOwner);
         VaultStorage storage $ = _getVaultStorage();
@@ -68,34 +68,7 @@ contract VaultController is
         $.eqTokenAddr = _eqTokenAddr;
         $.usdcToken = _usdcToken;
         $.eqID = _eqID;
-    }
-
-    function userApprove(
-        address owner,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
-        VaultStorage storage $ = _getVaultStorage();
-        IERC20Permit($.usdcToken).permit(
-            owner,
-            address(this),
-            value,
-            deadline,
-            v,
-            r,
-            s
-        );
-        emit ApproveSuccess(owner);
-    }
-
-    function depositUSDC(address user, uint256 value) external onlyOwner {
-        VaultStorage storage $ = _getVaultStorage();
-        IERC20($.usdcToken).transferFrom(user, address(this), value);
-        IEqToken($.eqTokenAddr).mint(user, $.eqID, value, "");
-        emit DepositUSDC(user, value);
+        $.ratingPrecision = _ratingPrecision;
     }
 
     function _getUserEqTokenNum(
@@ -107,15 +80,27 @@ contract VaultController is
 
     function redeemCTF2USDC(
         bytes32 conditionId,
-        uint256[] calldata indexSets,
-        uint256 amount
+        uint256[] calldata indexSets
     ) external onlyOwner {
-        // TODO
+        VaultStorage storage $ = _getVaultStorage();
+        IConditionalTokens($.ctfCore).redeemPositions(IERC20($.usdcToken), bytes32(0), conditionId, indexSets);
     }
 
-    function withdrawUSDC(address user) 
+    function getBalanceOfUSDC() external {
+        VaultStorage storage $ = _getVaultStorage();
+        $.totalUSDC = IERC20($.usdcToken).balanceOf(address(this));
+    }
+
+    function withdrawUSDC(address user) // TODO
     external onlyOwner {
-        // TODO
+        VaultStorage storage $ = _getVaultStorage();
+        uint256 userEqAmount = IEqToken($.eqTokenAddr).balanceOf(user, $.eqID);
+        uint256 totalEqAmount = IEqToken($.eqTokenAddr).getTotalAmount($.eqID);
+        uint256 totalUSDCAmount = $.totalUSDC;
+        uint256 value = Math.mulDiv(userEqAmount, totalUSDCAmount, totalEqAmount);
+        uint256 managerValue = Math.mulDiv(value, $.managerRating, $.ratingPrecision);
+        IERC20($.usdcToken).transfer(user, value - managerValue);
+        IERC20($.usdcToken).transfer($.managerAddr, managerValue);
     }
 
     function _authorizeUpgrade(
