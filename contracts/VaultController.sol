@@ -103,7 +103,7 @@ contract VaultController is
         uint256 managerValue = Math.mulDiv(value, $.managerRating, $.ratingPrecision);
         IERC20($.usdcToken).transfer(user, value - managerValue);
         IERC20($.usdcToken).transfer($.managerAddr, managerValue);
-        IEqToken($.eqTokenAddr).burn(user, $.eqID, userEqAmount);
+        IEqToken($.eqTokenAddr).controllerBurn(user, $.eqID, userEqAmount);
         emit Withdraw(user, value - managerValue, managerValue);
     }
 
