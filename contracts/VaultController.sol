@@ -12,7 +12,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 interface IVaultController {
     event Withdraw(address indexed user, uint256 value2User, uint256 value2Manage);
 
-    function redeemCTF2USDC(bytes32 conditionId, uint256[] calldata indexSets) external;
+    function redeemCTF2USDC(bytes32[] calldata conditionIds, uint256[][] calldata indexSets) external;
 
     function getBalanceOfUSDC() external;
 
@@ -79,11 +79,13 @@ contract VaultController is
     }
 
     function redeemCTF2USDC(
-        bytes32 conditionId,
-        uint256[] calldata indexSets
+        bytes32[] calldata conditionIds,
+        uint256[][] calldata indexSets
     ) external onlyOwner {
         VaultStorage storage $ = _getVaultStorage();
-        IConditionalTokens($.ctfCore).redeemPositions(IERC20($.usdcToken), bytes32(0), conditionId, indexSets);
+        for (uint i = 0; i < conditionIds.length; i++) {
+            IConditionalTokens($.ctfCore).redeemPositions(IERC20($.usdcToken), bytes32(0), conditionIds[i], indexSets[i]);
+        }
     }
 
     function getBalanceOfUSDC() external {
@@ -101,6 +103,8 @@ contract VaultController is
         uint256 managerValue = Math.mulDiv(value, $.managerRating, $.ratingPrecision);
         IERC20($.usdcToken).transfer(user, value - managerValue);
         IERC20($.usdcToken).transfer($.managerAddr, managerValue);
+        IEqToken($.eqTokenAddr).burn(user, $.eqID, userEqAmount);
+        emit Withdraw(user, value - managerValue, managerValue);
     }
 
     function _authorizeUpgrade(
