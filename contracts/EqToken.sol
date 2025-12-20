@@ -13,9 +13,8 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
  */
 
 /**
- * @title 
- * @author 
- * @notice 
+ * @title luna EqToken Contract
+ * @author @sjhana(github)
  */
 
 interface IEqToken {
@@ -184,6 +183,7 @@ contract EqToken is
 
     /**
      * @notice 判断所要操作的Token是否存在
+     * @dev 如果所要操作的eqToken不存在，则revert
      * @param id 所要操作的eqToken id
      */
     modifier isExistent(uint256 id) {
