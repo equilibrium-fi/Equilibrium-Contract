@@ -7,30 +7,119 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {Arrays} from "@openzeppelin/contracts/utils/Arrays.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+/**
+ * TODO
+ * 1.做测试
+ */
+
+/**
+ * @title 
+ * @author 
+ * @notice 
+ */
+
 interface IEqToken {
+    /**
+     * @notice 获取当前合约版本号
+     * @param version 版本号
+     */
     event Version(uint256 version);
 
+    /**
+     * @notice 当eqToken id生成时触发
+     * @param managerAddr 创建ETF的经理地址
+     * @param eqTokenID 被创建的ETF所对应的eqToken id
+     */
     event ManagerCreateID(address indexed managerAddr, uint256 indexed eqTokenID);
 
+    /**
+     * @notice 当eqToken id生成时触发,显示ETF的具体策略
+     * @param managerAddr 创建ETF的经理地址
+     * @param eqTokenID 被创建的ETF所对应的eqToken id
+     * @param percents 每种ctf Token占总数量的比例(默认精度为2)
+     * @param ctfIDs 每种ctf Token的id
+     * @param indexSets 每种ctf Token的掩码值(决定最终结果是哪个，如果是二元预测，则1代表no，2代表yes)
+     */
     event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, bytes32[] ctfIDs, uint256[] indexSets);
 
-    event RoleChanged(address indexed newAddr, address indexed oldAddr, bytes32 indexed role);
+    /**
+     * @notice 当有新地址被赋予职责时触发
+     * @param newAddr 被赋予新职责的地址
+     * @param role 被赋予的职责
+     */
+    event RoleChanged(address indexed newAddr, bytes32 indexed role);
 
+    /**
+     * @notice 当有地址被撤销职责时触发
+     * @param revokedAddr 被撤销职责的地址
+     * @param role 被撤销的职责
+     */
+    event RevokeRole(address indexed revokedAddr, bytes32 indexed role);
+
+    /**
+     * @notice 当更新了eqToken id所对应的链下数据的uri时触发
+     * @param newuri 所指向的新的uri
+     */
     event URIChanged(string indexed newuri);
 
+    /**
+     * @notice 生成ETF所对应的唯一eqToken id
+     * @dev 此函数使用keccak256中的encode将函数的四个入参按照顺序串型传入。将最终得到的hash值使用uint256强制转化成最终的eqToken id
+     * @param percents 每种ctf Token占总数量的比例(默认精度为2)
+     * @param ctfIDs 每种ctf Token的id
+     * @param indexSets 每种ctf Token的掩码值(决定最终结果是哪个。如果是二元预测，则1代表no，2代表yes；如果有多种结果，则以每种结果所对应的掩码为准)
+     * @param managerAddr 创建ETF的经理地址
+     */
     function generateID(uint256[] calldata percents, bytes32[] calldata ctfIDs, uint256[] calldata indexSets, address managerAddr) external returns(uint256);
 
+    /**
+     * @notice 重新设置新的uri(只有默认管理员才能调用)
+     * @dev 将ERC1155中的_setURI函数暴露出来，并设置为只有拥有默认管理员权限的地址才能调用
+     * @param newUri 新的URI地址
+     */
     function setURI(string memory newUri) external;
 
+    /**
+     * @notice 铸造所需数量和特定id eqToken(只有拥有MINTER role才能调用)
+     * @dev 使用ERC1155中的_mint函数，并记录在eqToken中所增加的对应id的总流通量(即_idBalances[id].totalAmount)
+     * @param to 最终获得铸造代币的地址
+     * @param id 需要铸造的eqToken id
+     * @param value 需要铸造的数量
+     * @param data 留空即可("")
+     */
     function mint(address to, uint256 id, uint256 value, bytes memory data) external;
 
-    function burn(address from, uint256 id, uint256 value) external;
+    /**
+     * @notice 销毁对应id和数量的eqToken
+     * @dev 该函数只能被拥有controller权限的合约调用
+     * @param from 被销毁eqToken的用户地址
+     * @param id 被销毁的eqToken id
+     * @param value 被销毁的eqToken数量
+     */
+    function controllerBurn(address from, uint256 id, uint256 value) external;
 
+    /**
+     * @notice 为新的地址赋予新的role
+     * @dev 只能被拥有对应role管理权限的地址调用
+     * @param role 被赋予的职责
+     * @param newAddr 被赋予职责的新地址
+     */
     function proposeRole(bytes32 role, address newAddr) external;
 
-    function acceptRole(bytes32 role, address callerConfirmation, address oldAdmin) external;
+    /**
+     * @notice 撤销拥有Role权限的地址
+     * @param role 被撤销的Role
+     * @param revokedAddr 被撤销Role的地址
+     */
+    function revokeRole(bytes32 role, address revokedAddr) external;
 
     function balanceOf(address account, uint256 id) external view returns (uint256);
+
+    /**
+     * @notice 查看需要查询的eqToken至今为止的总流通量(controllerBurn函数不会减少总量的记录)
+     * @param tokenID 需要查询的eqToken id
+     */
+    function getTotalAmount(uint256 tokenID) view external returns(uint256);
 }
 
 contract EqToken is
@@ -44,10 +133,10 @@ contract EqToken is
     using Arrays for address[];
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    bytes32 public constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
 
     struct _balanceBook {
-        mapping(address account => uint256) _balance;
+        mapping(address account => uint256 value) _balance;
         bool isSet;
         uint256 totalAmount;
     }
@@ -72,29 +161,38 @@ contract EqToken is
         }
     }
 
+    /**
+     * @notice EqToken合约初始化函数
+     * @dev 只能被代理合约调用一次，收到initializer修饰器保护
+     * @param _uri 用于设置合约中所有代币共享的元数据 URI 模板（通常包含 {id} 占位符），以便客户端能根据 Token ID 动态解析出每个代币的图片和属性信息
+     * @param minter 拥有mint权限的地址
+     * @param controller 拥有controller权限的地址(controller 可以销毁token)
+     * @param admin 拥有最高管理员权限的地址
+     */
     function __EqToken_init(
         string memory _uri,
         address minter,
-        address burner,
+        address controller,
         address admin
     ) public initializer {
         __ERC1155_init(_uri);
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(MINTER_ROLE, minter);
-        _grantRole(BURNER_ROLE, burner);
+        _grantRole(CONTROLLER_ROLE, controller);
     }
 
+    /**
+     * @notice 判断所要操作的Token是否存在
+     * @param id 所要操作的eqToken id
+     */
     modifier isExistent(uint256 id) {
         EqTokenStorage storage $ = _getEqTokenStorage();
         require($._idBalances[id].isSet, "this token is not existent");
         _;
     }
 
-    function getVersion() external {
-        emit Version(1);
-    }
-
+    /// @inheritdoc ERC1155Upgradeable
     function supportsInterface(
         bytes4 interfaceId
     )
@@ -108,19 +206,23 @@ contract EqToken is
             super.supportsInterface(interfaceId);
     }
 
+    /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
 
     }
+    
+    /// @notice 获取版本号
+    function getVersion() external {
+        emit Version(1);
+    }
 
-    //TODO
-    function burn(
+    function controllerBurn(
         address from,
         uint256 id,
         uint256 value
-    ) external onlyRole(BURNER_ROLE) isExistent(id) {
-        // TODO 如何设置在点击赎回之前我们没有权限销毁用户的eqToken
+    ) external onlyRole(CONTROLLER_ROLE) isExistent(id) {
         _burn(from, id, value);
     }
 
@@ -138,17 +240,17 @@ contract EqToken is
     function proposeRole(
         bytes32 role,
         address newAdmin
-        ) onlyRole(role) external {
+        ) onlyRole(getRoleAdmin(role)) external {
         _grantRole(role, newAdmin);
+        emit RoleChanged(newAdmin, role);
     }
 
-    function acceptRole(bytes32 role, 
-        address callerConfirmation, 
-        address oldRole
-        ) onlyRole(role) external {
-        require(callerConfirmation != oldRole, "this function can not be called by the old Admin");
-        _revokeRole(role, oldRole);
-        emit RoleChanged(callerConfirmation, oldRole, role);
+    function revokeRole(
+        bytes32 role,
+        address revokedAddr
+    ) onlyRole(getRoleAdmin(role)) override(AccessControlUpgradeable, IEqToken) public {
+        _revokeRole(role, revokedAddr);
+        emit RevokeRole(revokedAddr, role);
     }
 
     function generateID(
@@ -174,15 +276,15 @@ contract EqToken is
         emit URIChanged(newuri);
     }
 
-    function getUserAmount(uint256 tokenID, address userAddr) view external returns(uint256 , uint256) {
+    function getTotalAmount(uint256 tokenID) view external returns(uint256) {
         EqTokenStorage storage $ = _getEqTokenStorage();
         return (
-            $._idBalances[tokenID]._balance[userAddr],
             $._idBalances[tokenID].totalAmount
         );
     }
 
     // override functions
+    /// @inheritdoc ERC1155Upgradeable
     function _update(
         address from,
         address to,
@@ -230,6 +332,7 @@ contract EqToken is
         }
     }
 
+    /// @inheritdoc ERC1155Upgradeable
     function isApprovedForAll(
         address account,
         address operator
@@ -238,6 +341,7 @@ contract EqToken is
         return $._operatorApprovals[account][operator];
     }
 
+    /// @inheritdoc ERC1155Upgradeable
     function _setApprovalForAll(
         address owner,
         address operator,
@@ -254,11 +358,13 @@ contract EqToken is
         emit ApprovalForAll(owner, operator, approved);
     }
 
+    /// @inheritdoc ERC1155Upgradeable
     function _setURI(string memory newuri) internal override {
         EqTokenStorage storage $ = _getEqTokenStorage();
         $._uri = newuri;
     }
 
+    /// @inheritdoc ERC1155Upgradeable
     function uri(
         uint256 /* id */
     ) public view override onlyProxy returns (string memory) {
@@ -266,6 +372,7 @@ contract EqToken is
         return $._uri;
     }
 
+    /// @inheritdoc ERC1155Upgradeable
     function balanceOf(
         address account,
         uint256 id
