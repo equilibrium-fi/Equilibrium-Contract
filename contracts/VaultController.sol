@@ -9,14 +9,47 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IEqToken} from "./EqToken.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
+/**
+ * 5.做测试
+ */
+
+/**
+ * @title luna Vault Controller contract
+ * @author @sjhana(github)
+ */
+
 interface IVaultController {
-    event Withdraw(address indexed user, uint256 value2User, uint256 value2Manage);
+    /**
+     * @notice 当用户所拥有的stake被赎回时触发
+     * @param user 用户地址
+     * @param value2User 分发给用户的金额
+     * @param value2Manager 分发给manager
+     */
+    event Withdraw(address indexed user, uint256 value2User, uint256 value2Manager);
 
-    function redeemCTF2USDC(bytes32[] calldata conditionIds, uint256[][] calldata indexSets) external;
+    /**
+     * @notice 当合约初始化时触发
+     * @dev 只支持ERC20代币作为抵押品，如果是原生coin，请使用他们的wrapped版本
+     * @param stakeName 支持的抵押品名称
+     * @param stakeAddr 抵押品的合约地址
+     */
+    event SupportStake(string indexed stakeName, address stakeAddr);
 
-    function getBalanceOfUSDC() external;
+    /**
+     * @notice 赎回Vault中所有的Stake
+     * @dev 只能由owner调用
+     * @param conditionIds 需要被赎回的condition ids(是个bytes32的数组类型)
+     * @param indexSets 需要被赎回的token的掩码
+     */
+    function redeemCTF2Stake(bytes32[] calldata conditionIds, uint256[][] calldata indexSets) external returns(bool);
 
-    function withdrawUSDC(address user) external; //TODO
+    /**
+     * @notice 赎回用户所拥有的stake
+     * @dev 可以被任何人调用
+     * @param user 被赎回的地址
+     */
+    function withdrawStake(address user) external; //TODO
+
 }
 
 interface IConditionalTokens {
@@ -33,11 +66,11 @@ contract VaultController is
         uint256 eqID;
         uint256 managerRating;
         uint256 ratingPrecision;
-        uint256 totalUSDC;
+        uint256 totalStake;
         address managerAddr;
         address ctfCore;
-        address usdcToken;
         address eqTokenAddr;
+        address stakeAddr;
     }
 
     // keccak256(abi.encode(uint256(keccak256("luna.storage.VaultController")) - 1)) & ~bytes32(uint256(0xff))
@@ -50,6 +83,19 @@ contract VaultController is
         }
     }
 
+    /**
+     * @notice Vault初始化函数
+     * @dev 每个Vault只能调用一次
+     * @param initialOwner 初始化owner地址
+     * @param _eqID 该Vault所管理的eqID
+     * @param _managerRating manager能拿到的收益比例
+     * @param _ratingPrecision Rating的精度值
+     * @param _managerAddr 基金经理的地址
+     * @param _ctfCore ConditionalTokens地址
+     * @param _stakeAddr 质押品地址
+     * @param _eqTokenAddr EqToken合约地址
+     * @param stakeName 质押品名字
+     */
     function __Vault_init(
         address initialOwner,
         uint256 _eqID,
@@ -57,8 +103,9 @@ contract VaultController is
         uint256 _ratingPrecision,
         address _managerAddr,
         address _ctfCore,
-        address _usdcToken,
-        address _eqTokenAddr
+        address _stakeAddr,
+        address _eqTokenAddr,
+        string calldata stakeName
     ) public initializer {
         __Ownable_init(initialOwner);
         VaultStorage storage $ = _getVaultStorage();
@@ -66,43 +113,35 @@ contract VaultController is
         $.managerRating = _managerRating;
         $.ctfCore = _ctfCore;
         $.eqTokenAddr = _eqTokenAddr;
-        $.usdcToken = _usdcToken;
+        $.stakeAddr = _stakeAddr;
         $.eqID = _eqID;
         $.ratingPrecision = _ratingPrecision;
+        emit SupportStake(stakeName, _stakeAddr);
     }
 
-    function _getUserEqTokenNum(
-        address userAddr
-    ) external view returns (uint256) {
-        VaultStorage storage $ = _getVaultStorage();
-        return IEqToken($.eqTokenAddr).balanceOf(userAddr, $.eqID);
-    }
-
-    function redeemCTF2USDC(
+    function redeemCTF2Stake(
         bytes32[] calldata conditionIds,
         uint256[][] calldata indexSets
-    ) external onlyOwner {
+    ) external onlyOwner returns(bool) {
         VaultStorage storage $ = _getVaultStorage();
         for (uint i = 0; i < conditionIds.length; i++) {
-            IConditionalTokens($.ctfCore).redeemPositions(IERC20($.usdcToken), bytes32(0), conditionIds[i], indexSets[i]);
+            IConditionalTokens($.ctfCore).redeemPositions(IERC20($.stakeAddr), bytes32(0), conditionIds[i], indexSets[i]);
         }
+        $.totalStake = IERC20($.stakeAddr).balanceOf(msg.sender);
+        return true;
     }
 
-    function getBalanceOfUSDC() external {
-        VaultStorage storage $ = _getVaultStorage();
-        $.totalUSDC = IERC20($.usdcToken).balanceOf(address(this));
-    }
-
-    function withdrawUSDC(address user) // TODO
-    external onlyOwner {
+    function withdrawStake(address user) 
+    external {
         VaultStorage storage $ = _getVaultStorage();
         uint256 userEqAmount = IEqToken($.eqTokenAddr).balanceOf(user, $.eqID);
+        require(userEqAmount!=0, "this function can only be called by someone who has eqToken!");
         uint256 totalEqAmount = IEqToken($.eqTokenAddr).getTotalAmount($.eqID);
-        uint256 totalUSDCAmount = $.totalUSDC;
-        uint256 value = Math.mulDiv(userEqAmount, totalUSDCAmount, totalEqAmount);
+        uint256 totalStakeAmount = $.totalStake;
+        uint256 value = Math.mulDiv(userEqAmount, totalStakeAmount, totalEqAmount);
         uint256 managerValue = Math.mulDiv(value, $.managerRating, $.ratingPrecision);
-        IERC20($.usdcToken).transfer(user, value - managerValue);
-        IERC20($.usdcToken).transfer($.managerAddr, managerValue);
+        IERC20($.stakeAddr).transfer(user, value - managerValue);
+        IERC20($.stakeAddr).transfer($.managerAddr, managerValue);
         IEqToken($.eqTokenAddr).controllerBurn(user, $.eqID, userEqAmount);
         emit Withdraw(user, value - managerValue, managerValue);
     }
