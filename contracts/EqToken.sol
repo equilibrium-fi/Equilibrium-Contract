@@ -36,10 +36,10 @@ interface IEqToken {
      * @param managerAddr 创建ETF的经理地址
      * @param eqTokenID 被创建的ETF所对应的eqToken id
      * @param percents 每种ctf Token占总数量的比例(默认精度为2)
-     * @param ctfIDs 每种ctf Token的id
+     * @param conditionalIds 每种ctf Token所对应的conditional ids
      * @param indexSets 每种ctf Token的掩码值(决定最终结果是哪个，如果是二元预测，则1代表no，2代表yes)
      */
-    event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, bytes32[] ctfIDs, uint256[] indexSets);
+    event Strategy(address indexed managerAddr, uint256 indexed eqTokenID, uint256[] percents, bytes32[] conditionalIds, uint256[] indexSets);
 
     /**
      * @notice 当有新地址被赋予职责时触发
@@ -65,11 +65,11 @@ interface IEqToken {
      * @notice 生成ETF所对应的唯一eqToken id
      * @dev 此函数使用keccak256中的encode将函数的四个入参按照顺序串型传入。将最终得到的hash值使用uint256强制转化成最终的eqToken id
      * @param percents 每种ctf Token占总数量的比例(默认精度为2)
-     * @param ctfIDs 每种ctf Token的id
+     * @param conditionalIds 每种ctf Token的所对应的conditional id
      * @param indexSets 每种ctf Token的掩码值(决定最终结果是哪个。如果是二元预测，则1代表no，2代表yes；如果有多种结果，则以每种结果所对应的掩码为准)
      * @param managerAddr 创建ETF的经理地址
      */
-    function generateID(uint256[] calldata percents, bytes32[] calldata ctfIDs, uint256[] calldata indexSets, address managerAddr) external returns(uint256);
+    function generateID(uint256[] calldata percents, bytes32[] calldata conditionalIds, uint256[] calldata indexSets, address managerAddr) external returns(uint256);
 
     /**
      * @notice 重新设置新的uri(只有默认管理员才能调用)
@@ -255,17 +255,17 @@ contract EqToken is
 
     function generateID(
         uint256[] calldata percents,
-        bytes32[] calldata ctfIDs,
+        bytes32[] calldata conditionalIds,
         uint256[] calldata indexSets,
         address managerAddr
     ) external onlyProxy returns(uint256) {
         EqTokenStorage storage $ = _getEqTokenStorage();
         uint256 eqId = uint256(
-            keccak256(abi.encode(percents, ctfIDs, indexSets, managerAddr))
+            keccak256(abi.encode(percents, conditionalIds, indexSets, managerAddr))
         );
         $._idBalances[eqId].isSet = true;
         emit ManagerCreateID(managerAddr, eqId);
-        emit Strategy(managerAddr, eqId, percents, ctfIDs, indexSets);
+        emit Strategy(managerAddr, eqId, percents, conditionalIds, indexSets);
         return eqId;
     }
 
