@@ -15,6 +15,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 /**
  * @title luna EqToken Contract
  * @author @sjhana(github)
+ * @notice 用于管理ETF对应的eqToken合约
  */
 
 interface IEqToken {

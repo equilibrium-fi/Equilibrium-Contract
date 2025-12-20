@@ -16,6 +16,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 /**
  * @title luna Vault Controller contract
  * @author @sjhana(github)
+ * @notice 作为Vault的执行层
  */
 
 interface IVaultController {
