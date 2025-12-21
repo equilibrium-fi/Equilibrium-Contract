@@ -116,7 +116,7 @@ interface IEqToken {
     function balanceOf(address account, uint256 id) external view returns (uint256);
 
     /**
-     * @notice 查看需要查询的eqToken至今为止的总流通量(controllerBurn函数不会减少总量的记录)
+     * @notice 历史累计铸造量(controllerBurn函数不会减少总量的记录)
      * @param tokenID 需要查询的eqToken id
      */
     function getTotalAmount(uint256 tokenID) view external returns(uint256);
