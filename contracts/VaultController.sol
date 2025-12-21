@@ -128,7 +128,7 @@ contract VaultController is
         for (uint i = 0; i < conditionIds.length; i++) {
             IConditionalTokens($.ctfCore).redeemPositions(IERC20($.stakeAddr), bytes32(0), conditionIds[i], indexSets[i]);
         }
-        $.totalStake = IERC20($.stakeAddr).balanceOf(msg.sender);
+        $.totalStake = IERC20($.stakeAddr).balanceOf(address(this));
         return true;
     }
 
@@ -141,9 +141,9 @@ contract VaultController is
         uint256 totalStakeAmount = $.totalStake;
         uint256 value = Math.mulDiv(userEqAmount, totalStakeAmount, totalEqAmount);
         uint256 managerValue = Math.mulDiv(value, $.managerRating, $.ratingPrecision);
+        IEqToken($.eqTokenAddr).controllerBurn(user, $.eqID, userEqAmount);
         IERC20($.stakeAddr).transfer(user, value - managerValue);
         IERC20($.stakeAddr).transfer($.managerAddr, managerValue);
-        IEqToken($.eqTokenAddr).controllerBurn(user, $.eqID, userEqAmount);
         emit Withdraw(user, value - managerValue, managerValue);
     }
 
