@@ -10,6 +10,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 /**
  * TODO
  * 1.做测试
+ * 2.gas优化
  */
 
 /**
@@ -134,6 +135,7 @@ contract EqToken is
 
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant CONTROLLER_ROLE = keccak256("CONTROLLER_ROLE");
+    bytes32 public constant CONTROLLER_ADMIN_ROLE = keccak256("CONTROLLER_ADMIN_ROLE");
 
     struct _balanceBook {
         mapping(address account => uint256 value) _balance;
@@ -166,20 +168,21 @@ contract EqToken is
      * @dev 只能被代理合约调用一次，收到initializer修饰器保护
      * @param _uri 用于设置合约中所有代币共享的元数据 URI 模板（通常包含 {id} 占位符），以便客户端能根据 Token ID 动态解析出每个代币的图片和属性信息
      * @param minter 拥有mint权限的地址
-     * @param controller 拥有controller权限的地址(controller 可以销毁token)
+     * @param controllerAdmin 拥有赋予新地址controller权限的controllerAdmin地址(controller 可以销毁token) | 该权限赋予给Relayer
      * @param admin 拥有最高管理员权限的地址
      */
     function __EqToken_init(
         string memory _uri,
         address minter,
-        address controller,
+        address controllerAdmin,
         address admin
     ) public initializer {
         __ERC1155_init(_uri);
         __AccessControl_init();
+        _setRoleAdmin(CONTROLLER_ROLE, CONTROLLER_ADMIN_ROLE);
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(MINTER_ROLE, minter);
-        _grantRole(CONTROLLER_ROLE, controller);
+        _grantRole(CONTROLLER_ADMIN_ROLE, controllerAdmin);
     }
 
     /**
