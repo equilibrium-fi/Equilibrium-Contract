@@ -114,6 +114,11 @@ interface IEqToken {
      */
     function revokeRole(bytes32 role, address revokedAddr) external;
 
+    /**
+     * @notice 查询账户对应id的EqToken余额
+     * @param account 账户地址
+     * @param id 要查询的EqToken id
+     */
     function balanceOf(address account, uint256 id) external view returns (uint256);
 
     /**
@@ -167,7 +172,7 @@ contract EqToken is
      * @notice EqToken合约初始化函数
      * @dev 只能被代理合约调用一次，收到initializer修饰器保护
      * @param _uri 用于设置合约中所有代币共享的元数据 URI 模板（通常包含 {id} 占位符），以便客户端能根据 Token ID 动态解析出每个代币的图片和属性信息
-     * @param minter 拥有mint权限的地址
+     * @param minter 拥有mint权限的地址 | 该权限赋予给Relayer
      * @param controllerAdmin 拥有赋予新地址controller权限的controllerAdmin地址(controller 可以销毁token) | 该权限赋予给Relayer
      * @param admin 拥有最高管理员权限的地址
      */
