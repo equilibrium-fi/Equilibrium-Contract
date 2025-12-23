@@ -3,6 +3,9 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "@safe-global/protocol-kit": "^6.1.2",
+    "@safe-global/safe-core-sdk-types": "^5.1.0",
+    "dotenv": "^17.2.3",
     "hardhat": "^2.27.2",
     "prettier": "^3.7.4",
     "prettier-plugin-solidity": "^2.2.0"
