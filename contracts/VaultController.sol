@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -11,15 +11,24 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * 5.做测试
+ * 6.gas优化
  */
 
 /**
  * @title luna Vault Controller contract
  * @author @sjhana(github)
  * @notice 作为Vault的执行层
+ * @dev Owner的作用为指定新的升级合约
  */
 
 interface IVaultController {
+    /**
+     * @notice 当Vault的所有仓位赎回后触发
+     * @param totalRedeemed 共赎回的Stake数量
+     * @param newTotalStake 最新的Stake总量
+     */
+    event RedeemCTF(uint256 totalRedeemed, uint256 newTotalStake);
+
     /**
      * @notice 当用户所拥有的stake被赎回时触发
      * @param user 用户地址
@@ -49,19 +58,45 @@ interface IVaultController {
      * @dev 可以被任何人调用
      * @param user 被赎回的地址
      */
-    function withdrawStake(address user) external; //TODO
+    function withdrawStake(address user) external;
 
+    /**
+     * @notice 返回Vault所对应的EqID
+     */
+    function getEqID() view external returns(uint);
+
+    /**
+     * @notice 返回Vault隶属的Gnosis Safe地址
+     */
+    function getAvartar() view external returns(address);
+}
+
+interface IGnosisSafe {
+    function execTransactionFromModule(
+        address to,
+        uint256 value, 
+        bytes memory data, 
+        uint8 operation
+    ) external returns(bool success);
 }
 
 interface IConditionalTokens {
     function redeemPositions(IERC20 collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint[] calldata indexSets) external;
 }
 
+abstract contract Enum {
+    enum Operation {
+        Call,
+        DelegateCall
+    }
+}
+
 contract VaultController is
     IVaultController,
     Initializable,
     OwnableUpgradeable,
-    UUPSUpgradeable
+    UUPSUpgradeable,
+    Enum
 {
     struct VaultStorage {
         uint256 eqID;
@@ -72,6 +107,7 @@ contract VaultController is
         address ctfCore;
         address eqTokenAddr;
         address stakeAddr;
+        address avatar;
     }
 
     // keccak256(abi.encode(uint256(keccak256("luna.storage.VaultController")) - 1)) & ~bytes32(uint256(0xff))
@@ -94,7 +130,8 @@ contract VaultController is
      * @param _managerAddr 基金经理的地址
      * @param _ctfCore ConditionalTokens地址
      * @param _stakeAddr 质押品地址
-     * @param _eqTokenAddr EqToken合约地址
+     * @param _eqTokenAddr EqToken 合约地址
+     * @param _avatar Gnosis Safe 合约地址
      * @param stakeName 质押品名字
      */
     function __Vault_init(
@@ -106,10 +143,13 @@ contract VaultController is
         address _ctfCore,
         address _stakeAddr,
         address _eqTokenAddr,
+        address _avatar,
         string calldata stakeName
     ) public initializer {
         __Ownable_init(initialOwner);
         VaultStorage storage $ = _getVaultStorage();
+        require(_avatar!=address(0), "Invaild Gnosis Safe address");
+        $.avatar = _avatar;
         $.managerAddr = _managerAddr;
         $.managerRating = _managerRating;
         $.ctfCore = _ctfCore;
@@ -119,16 +159,39 @@ contract VaultController is
         $.ratingPrecision = _ratingPrecision;
         emit SupportStake(stakeName, _stakeAddr);
     }
+    
+    /**
+     * @dev 内部辅助函数：让 Safe 执行交易
+     */
+    function _exec(address to, uint256 value, bytes memory data) internal {
+        VaultStorage storage $ = _getVaultStorage();
+        bool success = IGnosisSafe($.avatar).execTransactionFromModule(
+            to,
+            value,
+            data,
+            uint8(Operation.Call)
+        );
+        require(success, "Module execution failed");
+    }
 
     function redeemCTF2Stake(
         bytes32[] calldata conditionIds,
         uint256[][] calldata indexSets
-    ) external onlyOwner returns(bool) {
+    ) external returns(bool) {
         VaultStorage storage $ = _getVaultStorage();
+
         for (uint i = 0; i < conditionIds.length; i++) {
-            IConditionalTokens($.ctfCore).redeemPositions(IERC20($.stakeAddr), bytes32(0), conditionIds[i], indexSets[i]);
+            bytes memory data = abi.encodeWithSelector(
+                IConditionalTokens.redeemPositions.selector,
+                $.stakeAddr,
+                bytes32(0),
+                conditionIds[i],
+                indexSets[i]
+            );
+            _exec($.ctfCore, 0, data);
         }
-        $.totalStake = IERC20($.stakeAddr).balanceOf(address(this));
+        $.totalStake = IERC20($.stakeAddr).balanceOf($.avatar);
+        emit RedeemCTF($.totalStake, $.totalStake);
         return true;
     }
 
@@ -141,10 +204,30 @@ contract VaultController is
         uint256 totalStakeAmount = $.totalStake;
         uint256 value = Math.mulDiv(userEqAmount, totalStakeAmount, totalEqAmount);
         uint256 managerValue = Math.mulDiv(value, $.managerRating, $.ratingPrecision);
+        bytes memory userTransfer = abi.encodeWithSelector(
+            IERC20.transfer.selector,
+            user,
+            value - managerValue
+        );
+        bytes memory managerTransfer = abi.encodeWithSelector(
+            IERC20.transfer.selector,
+            user,
+            managerValue
+        );
         IEqToken($.eqTokenAddr).controllerBurn(user, $.eqID, userEqAmount);
-        IERC20($.stakeAddr).transfer(user, value - managerValue);
-        IERC20($.stakeAddr).transfer($.managerAddr, managerValue);
+        _exec($.stakeAddr, 0, userTransfer);
+        _exec($.stakeAddr, 0, managerTransfer);
         emit Withdraw(user, value - managerValue, managerValue);
+    }
+
+    function getEqID() view external returns(uint) {
+        VaultStorage storage $ = _getVaultStorage();
+        return $.eqID;
+    }
+
+    function getAvartar() view external returns(address) {
+        VaultStorage storage $ = _getVaultStorage();
+        return $.avatar;
     }
 
     function _authorizeUpgrade(
