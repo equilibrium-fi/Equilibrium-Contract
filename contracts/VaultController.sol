@@ -204,6 +204,12 @@ contract VaultController is
         uint256 totalStakeAmount = $.totalStake;
         uint256 value = Math.mulDiv(userEqAmount, totalStakeAmount, totalEqAmount);
         uint256 managerValue = Math.mulDiv(value, $.managerRating, $.ratingPrecision);
+        bytes memory burnUserEqToken = abi.encodeWithSelector(
+            IEqToken.controllerBurn.selector,
+            user,
+            $.eqID,
+            userEqAmount
+        );
         bytes memory userTransfer = abi.encodeWithSelector(
             IERC20.transfer.selector,
             user,
@@ -214,7 +220,7 @@ contract VaultController is
             user,
             managerValue
         );
-        IEqToken($.eqTokenAddr).controllerBurn(user, $.eqID, userEqAmount);
+        _exec($.eqTokenAddr, 0, burnUserEqToken);
         _exec($.stakeAddr, 0, userTransfer);
         _exec($.stakeAddr, 0, managerTransfer);
         emit Withdraw(user, value - managerValue, managerValue);
