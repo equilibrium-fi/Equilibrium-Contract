@@ -11,12 +11,13 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
  * TODO
  * 1.做测试
  * 2.gas优化
+ * 3.考虑预留二元EqToken，可以参考ConditionalToken的设计架构，预留一个indexSets
  */
 
 /**
  * @title luna EqToken Contract
  * @author @sjhana(github)
- * @notice 用于管理ETF对应的eqToken合约
+ * @notice 用于管理Narrative对应的eqToken合约
  */
 
 interface IEqToken {
@@ -28,15 +29,15 @@ interface IEqToken {
 
     /**
      * @notice 当eqToken id生成时触发
-     * @param managerAddr 创建ETF的经理地址
-     * @param eqTokenID 被创建的ETF所对应的eqToken id
+     * @param managerAddr 创建Narrative的经理地址
+     * @param eqTokenID 被创建的Narrative所对应的eqToken id
      */
     event ManagerCreateID(address indexed managerAddr, uint256 indexed eqTokenID);
 
     /**
-     * @notice 当eqToken id生成时触发,显示ETF的具体策略
-     * @param managerAddr 创建ETF的经理地址
-     * @param eqTokenID 被创建的ETF所对应的eqToken id
+     * @notice 当eqToken id生成时触发,显示Narrative的具体策略
+     * @param managerAddr 创建Narrative的经理地址
+     * @param eqTokenID 被创建的Narrative所对应的eqToken id
      * @param percents 每种ctf Token占总数量的比例(默认精度为2)
      * @param conditionalIds 每种ctf Token所对应的conditional ids
      * @param indexSets 每种ctf Token的掩码值(决定最终结果是哪个，如果是二元预测，则1代表no，2代表yes)
@@ -64,12 +65,12 @@ interface IEqToken {
     event URIChanged(string indexed newuri);
 
     /**
-     * @notice 生成ETF所对应的唯一eqToken id
+     * @notice 生成Narrative所对应的唯一eqToken id
      * @dev 此函数使用keccak256中的encode将函数的四个入参按照顺序串型传入。将最终得到的hash值使用uint256强制转化成最终的eqToken id
      * @param percents 每种ctf Token占总数量的比例(默认精度为2)
      * @param conditionalIds 每种ctf Token的所对应的conditional id
      * @param indexSets 每种ctf Token的掩码值(决定最终结果是哪个。如果是二元预测，则1代表no，2代表yes；如果有多种结果，则以每种结果所对应的掩码为准)
-     * @param managerAddr 创建ETF的经理地址
+     * @param managerAddr 创建Narrative的经理地址
      */
     function generateID(uint256[] calldata percents, bytes32[] calldata conditionalIds, uint256[] calldata indexSets, address managerAddr) external returns(uint256);
 
