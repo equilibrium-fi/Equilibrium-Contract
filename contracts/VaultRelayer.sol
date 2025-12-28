@@ -10,6 +10,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 
 /**
  * TODO
+ * 4.将deposit函数更改为将cashAccount中的ctf代币转账至Vault中
  * 5.做测试 
  * 6.gas优化
  */
@@ -43,14 +44,14 @@ interface IVaultRelayer {
     event SupportedStake(string indexed stakeName, address stakeAddr);
 
     /**
-     * @notice 将用户的质押品转发至指定vault,并铸造相对应的EqToken发放给用户
+     * @notice 将cashAccount中的ctf代币转账至Vault中
      * @dev 只能被默认管理员调用,EqToken的数量和用户质押品数量相等,包括精度
      * @param stakeName 质押品名字
      * @param from 用户地址
      * @param vaultAddr vault地址
      * @param value 质押品数量
      */
-    function deposit(string calldata stakeName, address from, address vaultAddr, uint256 value) external returns(bool);
+    function depositBatch2Vault(string calldata stakeName, address from, address vaultAddr, uint256 value) external returns(bool);
 
     /**
      * @notice 注册新的vault

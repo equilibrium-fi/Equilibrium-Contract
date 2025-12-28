@@ -10,6 +10,10 @@ import {IEqToken} from "./EqToken.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
+ * 1.重写为VaultController Module
+ * 2.增加支持被 Module Guard 监管的功能
+ * 3.每个用户转进来的金额进行记录
+ * 4.新增授权功能 ERC20 approve()
  * 5.做测试
  * 6.gas优化
  */
@@ -118,7 +122,9 @@ contract VaultController is
         address _stakeAddr,
         address _eqTokenAddr,
         string calldata stakeName
-    ) public initializer {
+    ) public initializer 
+    returns (uint256 eqID)
+    {
         __Ownable_init(initialOwner);
         VaultStorage storage $ = _getVaultStorage();
         $.managerAddr = _managerAddr;
@@ -129,6 +135,7 @@ contract VaultController is
         $.eqID = _eqID;
         $.ratingPrecision = _ratingPrecision;
         emit SupportStake(stakeName, _stakeAddr);
+        return $.eqID;
     }
 
     function redeemCTF2Stake(
